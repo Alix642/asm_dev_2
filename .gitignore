@@ -1,0 +1,11 @@
+# Fichiers compilés
+*.o
+*.a
+*.so
+
+# Exécutables de test générés
+/tests/fixtures/hello
+
+# Fichiers temporaires
+*~
+*.swp
