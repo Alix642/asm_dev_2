@@ -34,16 +34,22 @@ MACHINES = {
     243: "RISC-V",
 }
 
+TAILLES_ENTREE_PROGRAMME = {
+    1: 32,  # ELF32
+    2: 56,  # ELF64
+}
+
 
 class ELFError(Exception):
     """Erreur de lecture ou de validation d'un fichier ELF."""
 
 
 def analyser_en_tete(chemin: Path) -> dict:
-    """Lit et valide l'en-tête ELF sans exécuter le fichier."""
+    """Analyse et valide l'en-tête ELF sans exécuter ni modifier le fichier."""
 
     try:
         with chemin.open("rb") as fichier:
+            taille_fichier = chemin.stat().st_size
             donnees = fichier.read(64)
     except OSError as erreur:
         raise ELFError(f"Impossible de lire le fichier : {erreur}") from erreur
@@ -56,6 +62,17 @@ def analyser_en_tete(chemin: Path) -> dict:
 
     classe = donnees[4]
     encodage = donnees[5]
+    version_identification = donnees[6]
+
+    if classe not in CLASSES:
+        raise ELFError(f"Classe ELF inconnue : {classe}.")
+
+    if encodage not in ENCODINGS:
+        raise ELFError(f"Encodage ELF inconnu : {encodage}.")
+
+    classe = donnees[4]
+    encodage = donnees[5]
+    version_identification = donnees[6]
 
     if classe not in CLASSES:
         raise ELFError(f"Classe ELF inconnue : {classe}.")
@@ -68,19 +85,40 @@ def analyser_en_tete(chemin: Path) -> dict:
     if len(donnees) < taille_entete:
         raise ELFError("En-tête ELF incomplet.")
 
+    if version_identification != 1:
+        raise ELFError(
+            f"Version ELF d'identification invalide : {version_identification}."
+        )
+
+    if version_identification != 1:
+        raise ELFError(
+            f"Version ELF d'identification invalide : {version_identification}."
+        )
+
+    taille_entete = 52 if classe == 1 else 64
+
+    if len(donnees) < taille_entete:
+        raise ELFError("En-tête ELF incomplet.")
+
     ordre = "<" if encodage == 1 else ">"
 
-    if classe == 1:
-        champs = struct.unpack_from(ordre + "HHIIIIIHHHHHH", donnees, 16)
-    else:
-        champs = struct.unpack_from(ordre + "HHIQQQIHHHHHH", donnees, 16)
+    format_entete = (
+        ordre + "HHIIIIIHHHHHH"
+        if classe == 1
+        else ordre + "HHIQQQIHHHHHH"
+    )
+
+    try:
+        champs = struct.unpack_from(format_entete, donnees, 16)
+    except struct.error as erreur:
+        raise ELFError("Impossible de décoder l'en-tête ELF.") from erreur
 
     (
         type_fichier,
         machine,
-        _version,
+        version_entete,
         point_entree,
-        _debut_programmes,
+        debut_programmes,
         _debut_sections,
         _drapeaux,
         taille_header,
@@ -91,8 +129,31 @@ def analyser_en_tete(chemin: Path) -> dict:
         _index_chaines,
     ) = champs
 
+    if version_entete != 1:
+        raise ELFError(f"Version ELF invalide : {version_entete}.")
+
     if taille_header != taille_entete:
         raise ELFError("Taille d'en-tête incohérente avec la classe ELF.")
+
+    taille_programme_attendue = TAILLES_ENTREE_PROGRAMME[classe]
+
+    if nombre_programmes > 0:
+        if taille_programme < taille_programme_attendue:
+            raise ELFError(
+                "Taille d'entrée de programme trop petite pour cette classe ELF."
+            )
+
+        fin_table = debut_programmes + taille_programme * nombre_programmes
+
+        if debut_programmes < taille_header:
+            raise ELFError(
+                "Position de la table des entrées de programme invalide."
+            )
+
+        if fin_table > taille_fichier:
+            raise ELFError(
+                "Table des entrées de programme tronquée ou hors du fichier."
+            )
 
     return {
         "chemin": str(chemin),

@@ -9,3 +9,7 @@
 # Fichiers temporaires
 *~
 *.swp
+
+# Python
+__pycache__/
+*.py[cod]
