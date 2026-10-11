@@ -80,11 +80,6 @@ def analyser_en_tete(chemin: Path) -> dict:
             f"Version ELF d'identification invalide : {version_identification}."
         )
 
-    taille_entete = 52 if classe == 1 else 64
-
-    if len(donnees) < taille_entete:
-        raise ELFError("En-tête ELF incomplet.")
-
     ordre = "<" if encodage == 1 else ">"
 
     format_entete = (

@@ -13,15 +13,40 @@ BINAIRE_TEST = RACINE / "tests" / "fixtures" / "hello"
 class TestAnalyseELF(unittest.TestCase):
 
     def test_analyse_binaire_elf(self):
-        if not BINAIRE_TEST.exists():
-            self.skipTest("Lancer d'abord tests/verify_elf.sh")
+        with tempfile.TemporaryDirectory() as dossier:
+            chemin = Path(dossier) / "minimal.elf"
+            donnees = bytearray(120)
 
-        rapport = analyser_en_tete(BINAIRE_TEST)
+            # Identification ELF64, little endian, version 1.
+            donnees[:7] = b"\x7fELF\x02\x01\x01"
+
+            # En-tête ELF64 avec une entrée de programme.
+            struct.pack_into(
+                "<HHIQQQIHHHHHH",
+                donnees,
+                16,
+                2,       # ET_EXEC
+                62,      # x86-64
+                1,       # Version
+                0x400000,
+                64,      # Début de la table des programmes
+                0,       # Début de la table des sections
+                0,       # Drapeaux
+                64,      # Taille de l'en-tête ELF
+                56,      # Taille d'une entrée de programme
+                1,       # Nombre d'entrées
+                0, 0, 0,
+            )
+
+            chemin.write_bytes(donnees)
+            rapport = analyser_en_tete(chemin)
 
         self.assertEqual(rapport["classe"], "ELF64")
         self.assertEqual(rapport["encodage"], "Little endian")
         self.assertEqual(rapport["architecture"], "AMD x86-64")
-        self.assertEqual(rapport["nombre_entrees_programme"], 13)
+        self.assertEqual(rapport["type"], "ET_EXEC (exécutable)")
+        self.assertEqual(rapport["point_entree"], 0x400000)
+        self.assertEqual(rapport["nombre_entrees_programme"], 1)
 
     def test_fichier_non_elf(self):
         with tempfile.TemporaryDirectory() as dossier:
