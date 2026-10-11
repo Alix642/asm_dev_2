@@ -70,25 +70,10 @@ def analyser_en_tete(chemin: Path) -> dict:
     if encodage not in ENCODINGS:
         raise ELFError(f"Encodage ELF inconnu : {encodage}.")
 
-    classe = donnees[4]
-    encodage = donnees[5]
-    version_identification = donnees[6]
-
-    if classe not in CLASSES:
-        raise ELFError(f"Classe ELF inconnue : {classe}.")
-
-    if encodage not in ENCODINGS:
-        raise ELFError(f"Encodage ELF inconnu : {encodage}.")
-
     taille_entete = 52 if classe == 1 else 64
 
     if len(donnees) < taille_entete:
         raise ELFError("En-tête ELF incomplet.")
-
-    if version_identification != 1:
-        raise ELFError(
-            f"Version ELF d'identification invalide : {version_identification}."
-        )
 
     if version_identification != 1:
         raise ELFError(
